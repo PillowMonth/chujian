@@ -19,7 +19,8 @@
 </head>
 <body>
     <h2>🌟 简码生成器</h2>
-    <p>选择字频文件和全码词库（支持自动跳过表头），生成排序后的全码表与简码表。</p>
+    <p>选择字频文件和全码词库（支持自动跳过表头），生成排序后的全码表与简码表。<br>
+    <small>全码表按频率降序，简码表按简码字母 A→Z 排序。</small></p>
     <div id="errorMsg" class="error"></div>
 
     <label>① 字频文件</label>
@@ -42,7 +43,7 @@
 
         <hr>
 
-        <h3>📄 简码映射表</h3>
+        <h3>📄 简码映射表（按简码 A→Z 排序）</h3>
         <pre id="shortOut"></pre>
         <div class="btns">
             <button onclick="copyText('shortOut')">📋 复制</button>
@@ -51,7 +52,6 @@
     </div>
 
     <script>
-        // 显示错误信息
         function showError(msg) {
             const el = document.getElementById('errorMsg');
             el.textContent = msg;
@@ -59,20 +59,11 @@
             setTimeout(() => { el.style.display = 'none'; }, 5000);
         }
 
-        // 兼容所有浏览器的复制函数
         function copyText(elementId) {
             const text = document.getElementById(elementId).textContent;
-            if (!text) {
-                showError('没有可复制的内容');
-                return;
-            }
-            // 优先使用 clipboard API
+            if (!text) { showError('没有可复制的内容'); return; }
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => {
-                    alert('已复制到剪贴板');
-                }).catch(() => {
-                    fallbackCopy(text);
-                });
+                navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板')).catch(() => fallbackCopy(text));
             } else {
                 fallbackCopy(text);
             }
@@ -85,12 +76,7 @@
             textarea.style.left = '-9999px';
             document.body.appendChild(textarea);
             textarea.select();
-            try {
-                document.execCommand('copy');
-                alert('已复制到剪贴板');
-            } catch (err) {
-                showError('复制失败，请手动复制');
-            }
+            try { document.execCommand('copy'); alert('已复制到剪贴板'); } catch (e) { showError('复制失败，请手动复制'); }
             document.body.removeChild(textarea);
         }
 
@@ -109,26 +95,21 @@
             try {
                 const zipinFile = document.getElementById('zipinFile').files[0];
                 const dictFile = document.getElementById('dictFile').files[0];
-                if (!zipinFile || !dictFile) {
-                    showError('请先选择两个文件');
-                    return;
-                }
+                if (!zipinFile || !dictFile) { showError('请先选择两个文件'); return; }
 
                 const zipinText = await zipinFile.text();
                 const dictText = await dictFile.text();
 
-                // ---------- 第一步：解析字频文件 ----------
+                // ---------- 字频解析 ----------
                 const freqMap = new Map();
                 let zlines = zipinText.split(/\r?\n/);
                 if (zlines.length > 0) {
                     const firstParts = zlines[0].trim().split(/\s+/);
-                    if (firstParts.length >= 2 && isNaN(parseFloat(firstParts[1]))) {
-                        zlines.shift();
-                    }
+                    if (firstParts.length >= 2 && isNaN(parseFloat(firstParts[1]))) zlines.shift();
                 }
                 for (let line of zlines) {
                     line = line.trim();
-                    if (line === '') continue;
+                    if (!line) continue;
                     const parts = line.split(/\s+/);
                     if (parts.length >= 2) {
                         const word = parts[0];
@@ -137,24 +118,19 @@
                     }
                 }
 
-                // ---------- 第二步：解析全码词库 ----------
+                // ---------- 全码词库解析 ----------
                 const fullRows = [];
                 let dlines = dictText.split(/\r?\n/);
                 let startIndex = 0;
-                while (startIndex < dlines.length && dlines[startIndex].trim().startsWith('#')) {
-                    startIndex++;
-                }
+                while (startIndex < dlines.length && dlines[startIndex].trim().startsWith('#')) startIndex++;
                 if (startIndex < dlines.length && dlines[startIndex].trim() === '---') {
                     for (let i = startIndex + 1; i < dlines.length; i++) {
-                        if (dlines[i].trim() === '...') {
-                            startIndex = i + 1;
-                            break;
-                        }
+                        if (dlines[i].trim() === '...') { startIndex = i + 1; break; }
                     }
                 }
                 for (let i = startIndex; i < dlines.length; i++) {
                     let line = dlines[i].trim();
-                    if (line === '' || line.startsWith('#')) continue;
+                    if (!line || line.startsWith('#')) continue;
                     const parts = line.split(/\s+/);
                     if (parts.length < 2) continue;
                     const word = parts[0];
@@ -163,28 +139,23 @@
                     fullRows.push({ word, code, freq });
                 }
 
-                // 排序
+                // 全码排序：频率降序，词条升序
                 fullRows.sort((a, b) => {
                     if (b.freq !== a.freq) return b.freq - a.freq;
                     return a.word.localeCompare(b.word, 'zh-CN');
                 });
 
-                const starmoonLines = fullRows.map(r => `${r.word}\t${r.code}\t${r.freq}`);
-                const starmoonStr = starmoonLines.join('\n');
+                const starmoonStr = fullRows.map(r => `${r.word}\t${r.code}\t${r.freq}`).join('\n');
 
-                // ---------- 第三步：分配简码 ----------
+                // ---------- 简码分配 ----------
                 const wordMap = new Map();
                 const codeSet = new Set();
-
                 for (const row of fullRows) {
-                    const word = row.word;
-                    if (wordMap.has(word)) continue;
-                    const code = row.code;
-                    const freq = row.freq;
-                    let len = code.length;
-                    if (code.length < 4 || codeSet.has(code)) len += 1;
-                    wordMap.set(word, { code, freq, adjLen: len });
-                    codeSet.add(code);
+                    if (wordMap.has(row.word)) continue;
+                    const len = row.code.length;
+                    const adjLen = (len < 4 || codeSet.has(row.code)) ? len + 1 : len;
+                    wordMap.set(row.word, { code: row.code, freq: row.freq, adjLen });
+                    codeSet.add(row.code);
                 }
 
                 const usedShort = new Set();
@@ -206,20 +177,18 @@
                         if (wordAssigned.has(word)) continue;
                         const v = wordMap.get(word);
                         if (v.freq < 1) continue;
-
                         const short = v.code.substring(0, i);
-                        if (short === v.code) continue;
-                        if (codeSet.has(short)) continue;
-                        if (usedShort.has(short)) continue;
-
+                        if (short === v.code || codeSet.has(short) || usedShort.has(short)) continue;
                         usedShort.add(short);
                         wordAssigned.add(word);
                         shortPairs.push([word, short]);
                     }
                 }
 
-                const shortLines = shortPairs.map(([word, code]) => `${word}\t${code}`);
-                const shortStr = shortLines.join('\n');
+                // ⭐ 简码按字母顺序 A→Z 排序
+                shortPairs.sort((a, b) => a[1].localeCompare(b[1]));
+
+                const shortStr = shortPairs.map(([word, code]) => `${word}\t${code}`).join('\n');
 
                 // 显示结果
                 document.getElementById('starmoonOut').textContent = starmoonStr || '(无结果)';
