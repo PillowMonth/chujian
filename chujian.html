@@ -20,7 +20,7 @@
 <body>
     <h2>🌟 简码生成器</h2>
     <p>选择字频文件和全码词库（支持自动跳过表头），生成排序后的全码表与简码表。<br>
-    <small>全码表按频率降序，简码表按简码字母 A→Z 排序。</small></p>
+    <small>全码表按频率降序；简码表按长度 1→2→3 分组，组内字母 A→Z 排序。</small></p>
     <div id="errorMsg" class="error"></div>
 
     <label>① 字频文件</label>
@@ -43,7 +43,7 @@
 
         <hr>
 
-        <h3>📄 简码映射表（按简码 A→Z 排序）</h3>
+        <h3>📄 简码映射表（1→2→3 分组，组内 A→Z）</h3>
         <pre id="shortOut"></pre>
         <div class="btns">
             <button onclick="copyText('shortOut')">📋 复制</button>
@@ -144,7 +144,6 @@
                     if (b.freq !== a.freq) return b.freq - a.freq;
                     return a.word.localeCompare(b.word, 'zh-CN');
                 });
-
                 const starmoonStr = fullRows.map(r => `${r.word}\t${r.code}\t${r.freq}`).join('\n');
 
                 // ---------- 简码分配 ----------
@@ -185,10 +184,24 @@
                     }
                 }
 
-                // ⭐ 简码按字母顺序 A→Z 排序
-                shortPairs.sort((a, b) => a[1].localeCompare(b[1]));
+                // ⭐ 1-2-3 分开排序：先按长度，再按字母
+                shortPairs.sort((a, b) => {
+                    if (a[1].length !== b[1].length) return a[1].length - b[1].length;
+                    return a[1].localeCompare(b[1]);
+                });
 
-                const shortStr = shortPairs.map(([word, code]) => `${word}\t${code}`).join('\n');
+                // 生成输出文本，组间用空行分隔
+                let shortStr = '';
+                let lastLen = 0;
+                for (const [word, code] of shortPairs) {
+                    const curLen = code.length;
+                    if (lastLen && curLen !== lastLen) {
+                        shortStr += '\n';  // 不同长度之间加空行
+                    }
+                    shortStr += `${word}\t${code}\n`;
+                    lastLen = curLen;
+                }
+                shortStr = shortStr.trimEnd();
 
                 // 显示结果
                 document.getElementById('starmoonOut').textContent = starmoonStr || '(无结果)';
