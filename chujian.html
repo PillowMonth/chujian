@@ -15,12 +15,14 @@
         .btns button { flex: 1; }
         hr { margin: 20px 0; }
         .error { color: #c00; background: #fee; padding: 8px; border-radius: 4px; display: none; }
+        .switch-row { margin: 12px 0; display: flex; align-items: center; gap: 6px; }
+        .switch-row label { margin: 0; font-weight: normal; cursor: pointer; }
     </style>
 </head>
 <body>
     <h2>🌟 简码生成器</h2>
     <p>选择字频文件和全码词库（支持自动跳过表头），生成排序后的全码表与简码表。<br>
-    <small>全码表按频率降序；简码表按长度 1→2→3 分组，组内字母 A→Z 排序。</small></p>
+    <small>全码表按频率降序；简码表可按需开启排序（1→2→3 分组，组内 A→Z）。</small></p>
     <div id="errorMsg" class="error"></div>
 
     <label>① 字频文件</label>
@@ -30,6 +32,11 @@
     <label>② 全码词库</label>
     <div class="hint">每行格式：<code>词语	全码编码</code> （Tab 分隔，可带 YAML 头或 # 注释）</div>
     <input type="file" id="dictFile" accept=".yaml,.txt,.text/*">
+
+    <div class="switch-row">
+        <input type="checkbox" id="sortToggle" checked>
+        <label for="sortToggle">启用简码排序（按长度分组，组内 A→Z）</label>
+    </div>
 
     <button onclick="generate()">⚡ 开始生成</button>
 
@@ -43,7 +50,7 @@
 
         <hr>
 
-        <h3>📄 简码映射表（1→2→3 分组，组内 A→Z）</h3>
+        <h3>📄 简码映射表</h3>
         <pre id="shortOut"></pre>
         <div class="btns">
             <button onclick="copyText('shortOut')">📋 复制</button>
@@ -184,24 +191,33 @@
                     }
                 }
 
-                // ⭐ 1-2-3 分开排序：先按长度，再按字母
-                shortPairs.sort((a, b) => {
-                    if (a[1].length !== b[1].length) return a[1].length - b[1].length;
-                    return a[1].localeCompare(b[1]);
-                });
-
-                // 生成输出文本，组间用空行分隔
-                let shortStr = '';
-                let lastLen = 0;
-                for (const [word, code] of shortPairs) {
-                    const curLen = code.length;
-                    if (lastLen && curLen !== lastLen) {
-                        shortStr += '\n';  // 不同长度之间加空行
+                // ⭐ 根据开关决定是否排序
+                const sortEnabled = document.getElementById('sortToggle').checked;
+                let shortStr;
+                if (sortEnabled) {
+                    // 排序：先按长度，再按字母 A→Z（兼容所有浏览器）
+                    shortPairs.sort((a, b) => {
+                        const lenA = a[1].length;
+                        const lenB = b[1].length;
+                        if (lenA !== lenB) return lenA - lenB;
+                        if (a[1] < b[1]) return -1;
+                        if (a[1] > b[1]) return 1;
+                        return 0;
+                    });
+                    // 组间加空行
+                    let out = '';
+                    let lastLen = 0;
+                    for (const [word, code] of shortPairs) {
+                        const curLen = code.length;
+                        if (lastLen && curLen !== lastLen) out += '\n';
+                        out += `${word}\t${code}\n`;
+                        lastLen = curLen;
                     }
-                    shortStr += `${word}\t${code}\n`;
-                    lastLen = curLen;
+                    shortStr = out.trimEnd();
+                } else {
+                    // 不排序，保留原始生成顺序，不加空行
+                    shortStr = shortPairs.map(([word, code]) => `${word}\t${code}`).join('\n');
                 }
-                shortStr = shortStr.trimEnd();
 
                 // 显示结果
                 document.getElementById('starmoonOut').textContent = starmoonStr || '(无结果)';
