@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简码生成器</title>
+    <style>
+        body { font-family: sans-serif; padding: 16px; max-width: 600px; margin: auto; }
+        label { display: block; margin: 12px 0 4px; font-weight: bold; }
+        .hint { font-size: 0.9em; color: #666; margin-bottom: 8px; }
+        input[type="file"] { width: 100%; padding: 8px; }
+        button { margin: 16px 0; padding: 12px 24px; font-size: 16px; }
+        pre { background: #f5f5f5; padding: 12px; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; border: 1px solid #ccc; }
+        .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btns button { flex: 1; }
+        hr { margin: 20px 0; }
+        .error { color: #c00; background: #fee; padding: 8px; border-radius: 4px; display: none; }
+    </style>
+</head>
+<body>
+    <h2>🌟 简码生成器</h2>
+    <p>选择字频文件和全码词库（支持自动跳过表头），生成排序后的全码表与简码表。</p>
+    <div id="errorMsg" class="error"></div>
+
+    <label>① 字频文件</label>
+    <div class="hint">每行格式：<code>词语	频率</code> （Tab 分隔，可带标题行）</div>
+    <input type="file" id="zipinFile" accept=".txt,.text/*">
+
+    <label>② 全码词库</label>
+    <div class="hint">每行格式：<code>词语	全码编码</code> （Tab 分隔，可带 YAML 头或 # 注释）</div>
+    <input type="file" id="dictFile" accept=".yaml,.txt,.text/*">
+
+    <button onclick="generate()">⚡ 开始生成</button>
+
+    <div id="output" style="display:none;">
+        <h3>📄 全码表 + 频率（已按频率降序排列）</h3>
+        <pre id="starmoonOut"></pre>
+        <div class="btns">
+            <button onclick="copyText('starmoonOut')">📋 复制</button>
+            <button onclick="downloadText('全码表_频率.txt', 'starmoonOut')">💾 下载</button>
+        </div>
+
+        <hr>
+
+        <h3>📄 简码映射表</h3>
+        <pre id="shortOut"></pre>
+        <div class="btns">
+            <button onclick="copyText('shortOut')">📋 复制</button>
+            <button onclick="downloadText('简码映射表.txt', 'shortOut')">💾 下载</button>
+        </div>
+    </div>
+
+    <script>
+        // 显示错误信息
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 5000);
+        }
+
+        // 兼容所有浏览器的复制函数
+        function copyText(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            if (!text) {
+                showError('没有可复制的内容');
+                return;
+            }
+            // 优先使用 clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('已复制到剪贴板');
+                }).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                alert('已复制到剪贴板');
+            } catch (err) {
+                showError('复制失败，请手动复制');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function downloadText(filename, elementId) {
+            const text = document.getElementById(elementId).textContent;
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function generate() {
+            try {
+                const zipinFile = document.getElementById('zipinFile').files[0];
+                const dictFile = document.getElementById('dictFile').files[0];
+                if (!zipinFile || !dictFile) {
+                    showError('请先选择两个文件');
+                    return;
+                }
+
+                const zipinText = await zipinFile.text();
+                const dictText = await dictFile.text();
+
+                // ---------- 第一步：解析字频文件 ----------
+                const freqMap = new Map();
+                let zlines = zipinText.split(/\r?\n/);
+                if (zlines.length > 0) {
+                    const firstParts = zlines[0].trim().split(/\s+/);
+                    if (firstParts.length >= 2 && isNaN(parseFloat(firstParts[1]))) {
+                        zlines.shift();
+                    }
+                }
+                for (let line of zlines) {
+                    line = line.trim();
+                    if (line === '') continue;
+                    const parts = line.split(/\s+/);
+                    if (parts.length >= 2) {
+                        const word = parts[0];
+                        const freq = parseFloat(parts[1]);
+                        if (!isNaN(freq)) freqMap.set(word, freq);
+                    }
+                }
+
+                // ---------- 第二步：解析全码词库 ----------
+                const fullRows = [];
+                let dlines = dictText.split(/\r?\n/);
+                let startIndex = 0;
+                while (startIndex < dlines.length && dlines[startIndex].trim().startsWith('#')) {
+                    startIndex++;
+                }
+                if (startIndex < dlines.length && dlines[startIndex].trim() === '---') {
+                    for (let i = startIndex + 1; i < dlines.length; i++) {
+                        if (dlines[i].trim() === '...') {
+                            startIndex = i + 1;
+                            break;
+                        }
+                    }
+                }
+                for (let i = startIndex; i < dlines.length; i++) {
+                    let line = dlines[i].trim();
+                    if (line === '' || line.startsWith('#')) continue;
+                    const parts = line.split(/\s+/);
+                    if (parts.length < 2) continue;
+                    const word = parts[0];
+                    const code = parts[1];
+                    const freq = freqMap.get(word) || 0;
+                    fullRows.push({ word, code, freq });
+                }
+
+                // 排序
+                fullRows.sort((a, b) => {
+                    if (b.freq !== a.freq) return b.freq - a.freq;
+                    return a.word.localeCompare(b.word, 'zh-CN');
+                });
+
+                const starmoonLines = fullRows.map(r => `${r.word}\t${r.code}\t${r.freq}`);
+                const starmoonStr = starmoonLines.join('\n');
+
+                // ---------- 第三步：分配简码 ----------
+                const wordMap = new Map();
+                const codeSet = new Set();
+
+                for (const row of fullRows) {
+                    const word = row.word;
+                    if (wordMap.has(word)) continue;
+                    const code = row.code;
+                    const freq = row.freq;
+                    let len = code.length;
+                    if (code.length < 4 || codeSet.has(code)) len += 1;
+                    wordMap.set(word, { code, freq, adjLen: len });
+                    codeSet.add(code);
+                }
+
+                const usedShort = new Set();
+                const wordAssigned = new Set();
+                const shortPairs = [];
+
+                for (let i = 1; i <= 3; i++) {
+                    const sortedWords = Array.from(wordMap.keys()).sort((a, b) => {
+                        const va = wordMap.get(a);
+                        const vb = wordMap.get(b);
+                        const scoreA = va.freq * (va.adjLen - i - 1);
+                        const scoreB = vb.freq * (vb.adjLen - i - 1);
+                        if (scoreB !== scoreA) return scoreB - scoreA;
+                        if (vb.freq !== va.freq) return vb.freq - va.freq;
+                        return a.localeCompare(b, 'zh-CN');
+                    });
+
+                    for (const word of sortedWords) {
+                        if (wordAssigned.has(word)) continue;
+                        const v = wordMap.get(word);
+                        if (v.freq < 1) continue;
+
+                        const short = v.code.substring(0, i);
+                        if (short === v.code) continue;
+                        if (codeSet.has(short)) continue;
+                        if (usedShort.has(short)) continue;
+
+                        usedShort.add(short);
+                        wordAssigned.add(word);
+                        shortPairs.push([word, short]);
+                    }
+                }
+
+                const shortLines = shortPairs.map(([word, code]) => `${word}\t${code}`);
+                const shortStr = shortLines.join('\n');
+
+                // 显示结果
+                document.getElementById('starmoonOut').textContent = starmoonStr || '(无结果)';
+                document.getElementById('shortOut').textContent = shortStr || '(无符合条件的简码)';
+                document.getElementById('output').style.display = 'block';
+
+            } catch (err) {
+                showError('处理出错：' + err.message);
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>
