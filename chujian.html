@@ -22,7 +22,8 @@
 <body>
     <h2>🌟 简码生成器</h2>
     <p>选择字频文件和全码词库（支持自动跳过表头），生成排序后的全码表与简码表。<br>
-    <small>全码表按频率降序；简码表可按需开启排序（1→2→3 分组，组内 A→Z）。</small></p>
+    <small>全码表按频率降序；简码表可按需开启排序（1→2→3 分组，组内 A→Z）。<br>
+    ✨ 改进：字频相同时，文件中靠前的词视为频率更高，确保首选/次选识别正确。</small></p>
     <div id="errorMsg" class="error"></div>
 
     <label>① 字频文件</label>
@@ -109,6 +110,8 @@
 
                 // ---------- 字频解析 ----------
                 const freqMap = new Map();
+                const orderMap = new Map();       // 记录词语在字频文件中的出现顺序（行号）
+                let orderCounter = 0;
                 let zlines = zipinText.split(/\r?\n/);
                 if (zlines.length > 0) {
                     const firstParts = zlines[0].trim().split(/\s+/);
@@ -121,7 +124,10 @@
                     if (parts.length >= 2) {
                         const word = parts[0];
                         const freq = parseFloat(parts[1]);
-                        if (!isNaN(freq)) freqMap.set(word, freq);
+                        if (!isNaN(freq)) {
+                            freqMap.set(word, freq);
+                            orderMap.set(word, orderCounter++);   // 记录首次出现的顺序
+                        }
                     }
                 }
 
@@ -146,9 +152,12 @@
                     fullRows.push({ word, code, freq });
                 }
 
-                // 全码排序：频率降序，词条升序
+                // 全码排序：频率降序，若频率相同 → 字频文件顺序靠前优先，再相同 → 词语拼音排序
                 fullRows.sort((a, b) => {
                     if (b.freq !== a.freq) return b.freq - a.freq;
+                    const orderA = orderMap.has(a.word) ? orderMap.get(a.word) : Infinity;
+                    const orderB = orderMap.has(b.word) ? orderMap.get(b.word) : Infinity;
+                    if (orderA !== orderB) return orderA - orderB;
                     return a.word.localeCompare(b.word, 'zh-CN');
                 });
                 const starmoonStr = fullRows.map(r => `${r.word}\t${r.code}\t${r.freq}`).join('\n');
@@ -169,6 +178,7 @@
                 const shortPairs = [];
 
                 for (let i = 1; i <= 3; i++) {
+                    // 排序：综合得分 → 频率 → 字频顺序 → 拼音
                     const sortedWords = Array.from(wordMap.keys()).sort((a, b) => {
                         const va = wordMap.get(a);
                         const vb = wordMap.get(b);
@@ -176,6 +186,9 @@
                         const scoreB = vb.freq * (vb.adjLen - i - 1);
                         if (scoreB !== scoreA) return scoreB - scoreA;
                         if (vb.freq !== va.freq) return vb.freq - va.freq;
+                        const orderA = orderMap.has(a) ? orderMap.get(a) : Infinity;
+                        const orderB = orderMap.has(b) ? orderMap.get(b) : Infinity;
+                        if (orderA !== orderB) return orderA - orderB;
                         return a.localeCompare(b, 'zh-CN');
                     });
 
@@ -191,11 +204,10 @@
                     }
                 }
 
-                // ⭐ 根据开关决定是否排序
+                // 根据开关决定是否排序
                 const sortEnabled = document.getElementById('sortToggle').checked;
                 let shortStr;
                 if (sortEnabled) {
-                    // 排序：先按长度，再按字母 A→Z（兼容所有浏览器）
                     shortPairs.sort((a, b) => {
                         const lenA = a[1].length;
                         const lenB = b[1].length;
@@ -204,7 +216,6 @@
                         if (a[1] > b[1]) return 1;
                         return 0;
                     });
-                    // 组间加空行
                     let out = '';
                     let lastLen = 0;
                     for (const [word, code] of shortPairs) {
@@ -215,7 +226,6 @@
                     }
                     shortStr = out.trimEnd();
                 } else {
-                    // 不排序，保留原始生成顺序，不加空行
                     shortStr = shortPairs.map(([word, code]) => `${word}\t${code}`).join('\n');
                 }
 
