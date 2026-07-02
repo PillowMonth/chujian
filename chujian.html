@@ -270,7 +270,9 @@
         <label for="aeuioSwitch">启用“结尾字母视为码长-1”</label>
         <span style="font-size:0.8em;color:#999;">结尾字母：</span>
         <input type="text" id="aeuioLetters" value="aeuio" size="6" placeholder="aeuio" style="font-family: monospace;">
-        <span style="font-size:0.8em;color:#999;">（仅对首选生效，如aeuio、y等）</span>
+        <span style="font-size:0.8em;color:#999;">仅对全码长度 ≤</span>
+        <input type="number" id="aeuioMaxLen" value="3" min="1" max="20" step="1">
+        <span style="font-size:0.8em;color:#999;">的字生效（默认3，即1~3码的字适用）</span>
     </div>
 
     <button onclick="generate()">⚡ 开始生成</button>
@@ -344,20 +346,22 @@
             showToast('💾 下载完成');
         }
 
-        // 检查编码是否以指定字母集合中的任一字母结尾（忽略大小写）
+        // 检查编码是否以指定字母集合中的任一字母结尾
         function endsWithAny(code, letters) {
             if (!letters || letters.length === 0) return false;
             const lastChar = code.charAt(code.length - 1).toLowerCase();
             return letters.toLowerCase().includes(lastChar);
         }
 
-        // 计算有效编码长度（根据规则和首选状态）
-        function getEffectiveLength(word, code, ruleEnabled, allowedLetters, codeFirstWordMap) {
+        // 计算有效编码长度
+        function getEffectiveLength(word, code, ruleEnabled, allowedLetters, maxLenForRule, codeFirstWordMap) {
             if (!ruleEnabled || !allowedLetters) return code.length;
+            // 仅当全码长度 ≤ maxLenForRule 时才可能应用减1规则
+            if (code.length > maxLenForRule) return code.length;
             // 判断是否为首选词
             const firstWord = codeFirstWordMap.get(code);
             if (firstWord !== word) return code.length;
-            // 是首选，且结尾字母在允许列表中，则长度 -1
+            // 是首选且结尾匹配，则长度 -1（至少为1）
             if (endsWithAny(code, allowedLetters)) {
                 return Math.max(1, code.length - 1);
             }
@@ -373,7 +377,7 @@
                 const zipinText = await zipinFile.text();
                 const dictText = await dictFile.text();
 
-                // 获取参数
+                // 参数提取
                 const minCodeLengthInput = document.getElementById('minCodeLength');
                 let minCodeLength = parseInt(minCodeLengthInput.value, 10);
                 if (isNaN(minCodeLength) || minCodeLength < 1) { minCodeLength = 1; minCodeLengthInput.value = 1; }
@@ -384,8 +388,10 @@
 
                 const aeuioEnabled = document.getElementById('aeuioSwitch').checked;
                 const aeuioLetters = document.getElementById('aeuioLetters').value.trim().toLowerCase();
+                const aeuioMaxLenInput = document.getElementById('aeuioMaxLen');
+                let aeuioMaxLen = parseInt(aeuioMaxLenInput.value, 10);
+                if (isNaN(aeuioMaxLen) || aeuioMaxLen < 1) { aeuioMaxLen = 3; aeuioMaxLenInput.value = 3; }
 
-                // 如果开关开启但未输入任何字母，相当于不启用规则
                 const effectiveRuleEnabled = aeuioEnabled && aeuioLetters.length > 0;
 
                 // ---------- 字频解析 ----------
@@ -480,7 +486,9 @@
                         const v = wordMap.get(word);
                         if (v.freq < 1) continue;
 
-                        const effectiveLen = getEffectiveLength(word, v.code, effectiveRuleEnabled, aeuioLetters, codeFirstWordMap);
+                        const effectiveLen = getEffectiveLength(
+                            word, v.code, effectiveRuleEnabled, aeuioLetters, aeuioMaxLen, codeFirstWordMap
+                        );
 
                         if (effectiveLen < minCodeLength) continue;
                         if ((effectiveLen - i) < minDiff) continue;
@@ -497,7 +505,9 @@
                 let eligibleCount = 0;
                 for (const [w, v] of wordMap.entries()) {
                     if (v.freq < 1) continue;
-                    const effLen = getEffectiveLength(w, v.code, effectiveRuleEnabled, aeuioLetters, codeFirstWordMap);
+                    const effLen = getEffectiveLength(
+                        w, v.code, effectiveRuleEnabled, aeuioLetters, aeuioMaxLen, codeFirstWordMap
+                    );
                     if (effLen >= minCodeLength) eligibleCount++;
                 }
                 const assignedCount = shortPairs.length;
@@ -528,7 +538,9 @@
 
                 const statBadge = document.getElementById('shortStat');
                 let statText = '';
-                if (effectiveRuleEnabled) statText += `尾字母"${aeuioLetters}"仅首选-1 `;
+                if (effectiveRuleEnabled) {
+                    statText += `尾字母"${aeuioLetters}"仅首选-1 (≤${aeuioMaxLen}码) `;
+                }
                 if (minCodeLength > 1) statText += `全码≥${minCodeLength}码 `;
                 if (minDiff > 1) statText += `差值≥${minDiff} `;
                 statText += `| 符合条件 ${eligibleCount} 词 | 已分配 ${assignedCount} 条`;
