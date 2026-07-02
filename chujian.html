@@ -26,7 +26,7 @@
         body {
             font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
             padding: 20px 16px 40px;
-            max-width: 640px;
+            max-width: 680px;
             margin: auto;
             background: #fafbfc;
             color: var(--text);
@@ -177,8 +177,8 @@
             cursor: pointer;
             accent-color: var(--accent);
         }
-        .switch-row input[type="number"] {
-            width: 56px;
+        .switch-row input[type="number"],
+        .switch-row input[type="text"] {
             padding: 6px 8px;
             border: 2px solid var(--border);
             border-radius: 6px;
@@ -187,7 +187,14 @@
             transition: var(--transition);
             background: #fff;
         }
-        .switch-row input[type="number"]:focus {
+        .switch-row input[type="number"] {
+            width: 56px;
+        }
+        .switch-row input[type="text"] {
+            width: 80px;
+            text-align: left;
+        }
+        .switch-row input:focus {
             outline: none;
             border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
@@ -260,8 +267,10 @@
     </div>
     <div class="switch-row">
         <input type="checkbox" id="aeuioSwitch">
-        <label for="aeuioSwitch">将以 a / e / u / i / o 结尾的<strong>首选</strong>编码视为码长 -1</label>
-        <span style="font-size:0.8em;color:#999;">（仅对同一全码下频率最高的词生效，次选不变）</span>
+        <label for="aeuioSwitch">启用“结尾字母视为码长-1”</label>
+        <span style="font-size:0.8em;color:#999;">结尾字母：</span>
+        <input type="text" id="aeuioLetters" value="aeuio" size="6" placeholder="aeuio" style="font-family: monospace;">
+        <span style="font-size:0.8em;color:#999;">（仅对首选生效，如aeuio、y等）</span>
     </div>
 
     <button onclick="generate()">⚡ 开始生成</button>
@@ -335,20 +344,21 @@
             showToast('💾 下载完成');
         }
 
-        // 判断编码是否以 a/e/u/i/o 结尾
-        function endsWithAeuio(code) {
+        // 检查编码是否以指定字母集合中的任一字母结尾（忽略大小写）
+        function endsWithAny(code, letters) {
+            if (!letters || letters.length === 0) return false;
             const lastChar = code.charAt(code.length - 1).toLowerCase();
-            return 'aeuio'.includes(lastChar);
+            return letters.toLowerCase().includes(lastChar);
         }
 
-        // 获取有效编码长度（仅当 aeuio 开关开启、该词是其全码下的首选、且以 aeuio 结尾时，才视为长度 -1）
-        function getEffectiveLength(word, code, aeuioEnabled, codeFirstWordMap) {
-            if (!aeuioEnabled) return code.length;
-            // 判断是否为首选：同一全码下频率最高的词
+        // 计算有效编码长度（根据规则和首选状态）
+        function getEffectiveLength(word, code, ruleEnabled, allowedLetters, codeFirstWordMap) {
+            if (!ruleEnabled || !allowedLetters) return code.length;
+            // 判断是否为首选词
             const firstWord = codeFirstWordMap.get(code);
             if (firstWord !== word) return code.length;
-            // 是首选，且以 aeuio 结尾，则长度 -1
-            if (endsWithAeuio(code)) {
+            // 是首选，且结尾字母在允许列表中，则长度 -1
+            if (endsWithAny(code, allowedLetters)) {
                 return Math.max(1, code.length - 1);
             }
             return code.length;
@@ -363,7 +373,7 @@
                 const zipinText = await zipinFile.text();
                 const dictText = await dictFile.text();
 
-                // 获取各项参数
+                // 获取参数
                 const minCodeLengthInput = document.getElementById('minCodeLength');
                 let minCodeLength = parseInt(minCodeLengthInput.value, 10);
                 if (isNaN(minCodeLength) || minCodeLength < 1) { minCodeLength = 1; minCodeLengthInput.value = 1; }
@@ -373,6 +383,10 @@
                 if (isNaN(minDiff) || minDiff < 1) { minDiff = 1; minDiffInput.value = 1; }
 
                 const aeuioEnabled = document.getElementById('aeuioSwitch').checked;
+                const aeuioLetters = document.getElementById('aeuioLetters').value.trim().toLowerCase();
+
+                // 如果开关开启但未输入任何字母，相当于不启用规则
+                const effectiveRuleEnabled = aeuioEnabled && aeuioLetters.length > 0;
 
                 // ---------- 字频解析 ----------
                 const freqMap = new Map();
@@ -430,7 +444,7 @@
                 // ---------- 简码分配 ----------
                 const wordMap = new Map();
                 const codeSet = new Set();
-                const codeFirstWordMap = new Map(); // 每个全码对应的首选词
+                const codeFirstWordMap = new Map();
 
                 for (const row of fullRows) {
                     if (wordMap.has(row.word)) continue;
@@ -438,7 +452,6 @@
                     const adjLen = (len < 4 || codeSet.has(row.code)) ? len + 1 : len;
                     wordMap.set(row.word, { code: row.code, freq: row.freq, adjLen });
                     codeSet.add(row.code);
-                    // 由于 fullRows 已按频率降序排列，第一次遇到的词即为该编码的首选
                     if (!codeFirstWordMap.has(row.code)) {
                         codeFirstWordMap.set(row.code, row.word);
                     }
@@ -467,12 +480,9 @@
                         const v = wordMap.get(word);
                         if (v.freq < 1) continue;
 
-                        // 计算有效长度（仅首选且以 aeuio 结尾时才视为长度 -1）
-                        const effectiveLen = getEffectiveLength(word, v.code, aeuioEnabled, codeFirstWordMap);
+                        const effectiveLen = getEffectiveLength(word, v.code, effectiveRuleEnabled, aeuioLetters, codeFirstWordMap);
 
-                        // 条件1：有效长度达到下限
                         if (effectiveLen < minCodeLength) continue;
-                        // 条件2：简码长度差值满足下限
                         if ((effectiveLen - i) < minDiff) continue;
 
                         const short = v.code.substring(0, i);
@@ -483,23 +493,13 @@
                     }
                 }
 
-                // 统计符合条件的词数（使用有效长度，仅首选减1）
-                const eligibleCount = Array.from(wordMap.values()).filter(v => {
-                    if (v.freq < 1) return false;
-                    const word = codeFirstWordMap.get(v.code) === v.word ? v.word : null;
-                    const effLen = getEffectiveLength(
-                        word || '', v.code, aeuioEnabled, codeFirstWordMap
-                    );
-                    // 这里需要传入正确的 word，由于我们在 filter 中拿不到原始 word，用另一种方式
-                    // 直接从 wordMap 的 key 来匹配
-                    for (const [w, val] of wordMap) {
-                        if (val === v) {
-                            const eff = getEffectiveLength(w, v.code, aeuioEnabled, codeFirstWordMap);
-                            return eff >= minCodeLength;
-                        }
-                    }
-                    return false;
-                }).length;
+                // 统计符合条件词数
+                let eligibleCount = 0;
+                for (const [w, v] of wordMap.entries()) {
+                    if (v.freq < 1) continue;
+                    const effLen = getEffectiveLength(w, v.code, effectiveRuleEnabled, aeuioLetters, codeFirstWordMap);
+                    if (effLen >= minCodeLength) eligibleCount++;
+                }
                 const assignedCount = shortPairs.length;
 
                 const sortEnabled = document.getElementById('sortToggle').checked;
@@ -528,7 +528,7 @@
 
                 const statBadge = document.getElementById('shortStat');
                 let statText = '';
-                if (aeuioEnabled) statText += 'aeuio尾码仅首选-1 ';
+                if (effectiveRuleEnabled) statText += `尾字母"${aeuioLetters}"仅首选-1 `;
                 if (minCodeLength > 1) statText += `全码≥${minCodeLength}码 `;
                 if (minDiff > 1) statText += `差值≥${minDiff} `;
                 statText += `| 符合条件 ${eligibleCount} 词 | 已分配 ${assignedCount} 条`;
