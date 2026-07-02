@@ -5,25 +5,232 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>简码生成器</title>
     <style>
-        body { font-family: sans-serif; padding: 16px; max-width: 600px; margin: auto; }
-        label { display: block; margin: 12px 0 4px; font-weight: bold; }
-        .hint { font-size: 0.9em; color: #666; margin-bottom: 8px; }
-        input[type="file"] { width: 100%; padding: 8px; }
-        button { margin: 16px 0; padding: 12px 24px; font-size: 16px; }
-        pre { background: #f5f5f5; padding: 12px; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; border: 1px solid #ccc; }
-        .btns { display: flex; gap: 8px; flex-wrap: wrap; }
-        .btns button { flex: 1; }
-        hr { margin: 20px 0; }
-        .error { color: #c00; background: #fee; padding: 8px; border-radius: 4px; display: none; }
-        .switch-row { margin: 12px 0; display: flex; align-items: center; gap: 6px; }
-        .switch-row label { margin: 0; font-weight: normal; cursor: pointer; }
+        :root {
+            --bg: #ffffff;
+            --surface: #f8f9fa;
+            --surface2: #f0f0f0;
+            --border: #d0d5dd;
+            --text: #1a1a2e;
+            --text2: #555;
+            --accent: #4f46e5;
+            --accent-hover: #4338ca;
+            --danger: #c00;
+            --danger-bg: #fff5f5;
+            --radius: 10px;
+            --shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            --transition: 0.2s ease;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+            padding: 20px 16px 40px;
+            max-width: 640px;
+            margin: auto;
+            background: #fafbfc;
+            color: var(--text);
+            line-height: 1.6;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.6em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        p {
+            color: var(--text2);
+            margin: 0 0 16px;
+            font-size: 0.92em;
+        }
+        p small {
+            display: block;
+            margin-top: 4px;
+            color: #888;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+        label {
+            display: block;
+            margin: 16px 0 4px;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+        .hint {
+            font-size: 0.82em;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        .hint code {
+            background: var(--surface2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.9em;
+        }
+        input[type="file"]:hover {
+            border-color: var(--accent);
+            background: #f5f3ff;
+        }
+        button {
+            margin: 18px 0;
+            padding: 12px 28px;
+            font-size: 1em;
+            font-weight: 600;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: var(--transition);
+            letter-spacing: 0.3px;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+        }
+        button:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
+            transform: translateY(-1px);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 4px rgba(79, 70, 229, 0.2);
+        }
+        pre {
+            background: #fefefe;
+            padding: 14px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 320px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.88em;
+            line-height: 1.5;
+            box-shadow: var(--shadow);
+        }
+        .btns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+        .btns button {
+            flex: 1;
+            min-width: 80px;
+            margin: 0;
+            padding: 10px 16px;
+            font-size: 0.9em;
+            background: #fff;
+            color: var(--accent);
+            border: 2px solid var(--accent);
+            box-shadow: none;
+            letter-spacing: 0;
+        }
+        .btns button:hover {
+            background: #f5f3ff;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.12);
+            transform: translateY(-1px);
+        }
+        hr {
+            margin: 24px 0;
+            border: none;
+            border-top: 1px solid var(--border);
+        }
+        .error {
+            color: var(--danger);
+            background: var(--danger-bg);
+            padding: 10px 14px;
+            border-radius: var(--radius);
+            display: none;
+            font-size: 0.9em;
+            margin-bottom: 12px;
+            border: 1px solid #fecaca;
+        }
+        .switch-row {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 0.93em;
+        }
+        .switch-row label {
+            margin: 0;
+            font-weight: normal;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        .switch-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+        .switch-row input[type="number"] {
+            width: 56px;
+            padding: 6px 8px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9em;
+            text-align: center;
+            transition: var(--transition);
+            background: #fff;
+        }
+        .switch-row input[type="number"]:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        .section-title {
+            font-size: 1.05em;
+            font-weight: 700;
+            margin: 0 0 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #output {
+            animation: fadeIn 0.35s ease;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .stat-badge {
+            display: inline-block;
+            background: #eef2ff;
+            color: #4f46e5;
+            font-size: 0.78em;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+            margin-left: 4px;
+        }
     </style>
 </head>
 <body>
     <h2>🌟 简码生成器</h2>
     <p>选择字频文件和全码词库（支持自动跳过表头），生成排序后的全码表与简码表。<br>
-    <small>全码表按频率降序；简码表可按需开启排序（1→2→3 分组，组内 A→Z）。<br>
-    ✨ 改进：字频相同时，文件中靠前的词视为频率更高，确保首选/次选识别正确。</small></p>
+        <small>全码表按频率降序；简码表可按需开启排序（1→2→3 分组，组内 A→Z）。<br>
+            ✨ 改进：字频相同时，文件中靠前的词视为频率更高，确保首选/次选识别正确。</small>
+    </p>
     <div id="errorMsg" class="error"></div>
 
     <label>① 字频文件</label>
@@ -34,15 +241,22 @@
     <div class="hint">每行格式：<code>词语	全码编码</code> （Tab 分隔，可带 YAML 头或 # 注释）</div>
     <input type="file" id="dictFile" accept=".yaml,.txt,.text/*">
 
+    <!-- 选项区域 -->
     <div class="switch-row">
         <input type="checkbox" id="sortToggle" checked>
         <label for="sortToggle">启用简码排序（按长度分组，组内 A→Z）</label>
+    </div>
+    <div class="switch-row">
+        <label for="minCodeLength">仅对全码长度 ≥</label>
+        <input type="number" id="minCodeLength" value="1" min="1" max="20" step="1">
+        <label for="minCodeLength">的字生成简码</label>
+        <span style="font-size:0.8em;color:#999;">（设为 1 则全部生成；设为 4 则仅 4 码及以上出简码）</span>
     </div>
 
     <button onclick="generate()">⚡ 开始生成</button>
 
     <div id="output" style="display:none;">
-        <h3>📄 全码表 + 频率（已按频率降序排列）</h3>
+        <div class="section-title">📄 全码表 + 频率（已按频率降序排列）</div>
         <pre id="starmoonOut"></pre>
         <div class="btns">
             <button onclick="copyText('starmoonOut')">📋 复制</button>
@@ -51,7 +265,7 @@
 
         <hr>
 
-        <h3>📄 简码映射表</h3>
+        <div class="section-title">📄 简码映射表 <span id="shortStat" class="stat-badge"></span></div>
         <pre id="shortOut"></pre>
         <div class="btns">
             <button onclick="copyText('shortOut')">📋 复制</button>
@@ -64,14 +278,21 @@
             const el = document.getElementById('errorMsg');
             el.textContent = msg;
             el.style.display = 'block';
-            setTimeout(() => { el.style.display = 'none'; }, 5000);
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 6000);
         }
 
         function copyText(elementId) {
             const text = document.getElementById(elementId).textContent;
-            if (!text) { showError('没有可复制的内容'); return; }
+            if (!text) {
+                showError('没有可复制的内容');
+                return;
+            }
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板')).catch(() => fallbackCopy(text));
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('✅ 已复制到剪贴板');
+                }).catch(() => fallbackCopy(text));
             } else {
                 fallbackCopy(text);
             }
@@ -84,38 +305,83 @@
             textarea.style.left = '-9999px';
             document.body.appendChild(textarea);
             textarea.select();
-            try { document.execCommand('copy'); alert('已复制到剪贴板'); } catch (e) { showError('复制失败，请手动复制'); }
+            try {
+                document.execCommand('copy');
+                showToast('✅ 已复制到剪贴板');
+            } catch (e) {
+                showError('复制失败，请手动复制');
+            }
             document.body.removeChild(textarea);
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.textContent = msg;
+            toast.style.cssText = `
+            position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+            background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:20px;
+            font-size:0.9em;z-index:999;pointer-events:none;opacity:0;
+            transition:opacity 0.3s ease;box-shadow:0 4px 16px rgba(0,0,0,0.2);
+          `;
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.style.opacity = '1';
+            });
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 1800);
         }
 
         function downloadText(filename, elementId) {
             const text = document.getElementById(elementId).textContent;
-            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            if (!text) {
+                showError('没有可下载的内容');
+                return;
+            }
+            const blob = new Blob([text], {
+                type: 'text/plain;charset=utf-8'
+            });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
+            showToast('💾 下载完成');
         }
 
         async function generate() {
             try {
                 const zipinFile = document.getElementById('zipinFile').files[0];
                 const dictFile = document.getElementById('dictFile').files[0];
-                if (!zipinFile || !dictFile) { showError('请先选择两个文件'); return; }
+                if (!zipinFile || !dictFile) {
+                    showError('请先选择两个文件');
+                    return;
+                }
 
                 const zipinText = await zipinFile.text();
                 const dictText = await dictFile.text();
 
+                // 获取最小全码长度阈值
+                const minCodeLengthInput = document.getElementById('minCodeLength');
+                let minCodeLength = parseInt(minCodeLengthInput.value, 10);
+                if (isNaN(minCodeLength) || minCodeLength < 1) {
+                    minCodeLength = 1;
+                    minCodeLengthInput.value = 1;
+                }
+
                 // ---------- 字频解析 ----------
                 const freqMap = new Map();
-                const orderMap = new Map();       // 记录词语在字频文件中的出现顺序（行号）
+                const orderMap = new Map(); // 记录词语在字频文件中的出现顺序（行号）
                 let orderCounter = 0;
                 let zlines = zipinText.split(/\r?\n/);
+                // 自动跳过标题行（如果第一行第二列不是数字）
                 if (zlines.length > 0) {
                     const firstParts = zlines[0].trim().split(/\s+/);
-                    if (firstParts.length >= 2 && isNaN(parseFloat(firstParts[1]))) zlines.shift();
+                    if (firstParts.length >= 2 && isNaN(parseFloat(firstParts[1]))) {
+                        zlines.shift();
+                    }
                 }
                 for (let line of zlines) {
                     line = line.trim();
@@ -126,7 +392,9 @@
                         const freq = parseFloat(parts[1]);
                         if (!isNaN(freq)) {
                             freqMap.set(word, freq);
-                            orderMap.set(word, orderCounter++);   // 记录首次出现的顺序
+                            if (!orderMap.has(word)) {
+                                orderMap.set(word, orderCounter++); // 记录首次出现的顺序
+                            }
                         }
                     }
                 }
@@ -135,10 +403,17 @@
                 const fullRows = [];
                 let dlines = dictText.split(/\r?\n/);
                 let startIndex = 0;
-                while (startIndex < dlines.length && dlines[startIndex].trim().startsWith('#')) startIndex++;
+                // 跳过开头的 # 注释行
+                while (startIndex < dlines.length && dlines[startIndex].trim().startsWith('#')) {
+                    startIndex++;
+                }
+                // 跳过 YAML 头（--- ... ---）
                 if (startIndex < dlines.length && dlines[startIndex].trim() === '---') {
                     for (let i = startIndex + 1; i < dlines.length; i++) {
-                        if (dlines[i].trim() === '...') { startIndex = i + 1; break; }
+                        if (dlines[i].trim() === '...' || dlines[i].trim() === '---') {
+                            startIndex = i + 1;
+                            break;
+                        }
                     }
                 }
                 for (let i = startIndex; i < dlines.length; i++) {
@@ -149,10 +424,14 @@
                     const word = parts[0];
                     const code = parts[1];
                     const freq = freqMap.get(word) || 0;
-                    fullRows.push({ word, code, freq });
+                    fullRows.push({
+                        word,
+                        code,
+                        freq
+                    });
                 }
 
-                // 全码排序：频率降序，若频率相同 → 字频文件顺序靠前优先，再相同 → 词语拼音排序
+                // 全码排序：频率降序，若频率相同 → 字频文件顺序靠前优先，再相同 → 拼音排序
                 fullRows.sort((a, b) => {
                     if (b.freq !== a.freq) return b.freq - a.freq;
                     const orderA = orderMap.has(a.word) ? orderMap.get(a.word) : Infinity;
@@ -168,8 +447,13 @@
                 for (const row of fullRows) {
                     if (wordMap.has(row.word)) continue;
                     const len = row.code.length;
+                    // 调整长度：若原始长度 < 4 或编码重复，则 +1
                     const adjLen = (len < 4 || codeSet.has(row.code)) ? len + 1 : len;
-                    wordMap.set(row.word, { code: row.code, freq: row.freq, adjLen });
+                    wordMap.set(row.word, {
+                        code: row.code,
+                        freq: row.freq,
+                        adjLen
+                    });
                     codeSet.add(row.code);
                 }
 
@@ -196,6 +480,8 @@
                         if (wordAssigned.has(word)) continue;
                         const v = wordMap.get(word);
                         if (v.freq < 1) continue;
+                        // ✨ 新增：仅对全码长度 >= minCodeLength 的词分配简码
+                        if (v.code.length < minCodeLength) continue;
                         const short = v.code.substring(0, i);
                         if (short === v.code || codeSet.has(short) || usedShort.has(short)) continue;
                         usedShort.add(short);
@@ -204,7 +490,12 @@
                     }
                 }
 
-                // 根据开关决定是否排序
+                // 统计信息
+                const eligibleCount = Array.from(wordMap.values()).filter(v => v.code.length >= minCodeLength && v
+                    .freq >= 1).length;
+                const assignedCount = shortPairs.length;
+
+                // 根据开关决定是否排序简码输出
                 const sortEnabled = document.getElementById('sortToggle').checked;
                 let shortStr;
                 if (sortEnabled) {
@@ -229,10 +520,26 @@
                     shortStr = shortPairs.map(([word, code]) => `${word}\t${code}`).join('\n');
                 }
 
+                // 更新统计徽章
+                const statBadge = document.getElementById('shortStat');
+                if (minCodeLength > 1) {
+                    statBadge.textContent =
+                        `阈值≥${minCodeLength}码 | 符合条件 ${eligibleCount} 词 | 已分配 ${assignedCount} 条`;
+                } else {
+                    statBadge.textContent = `已分配 ${assignedCount} 条简码`;
+                }
+                statBadge.style.display = 'inline-block';
+
                 // 显示结果
                 document.getElementById('starmoonOut').textContent = starmoonStr || '(无结果)';
                 document.getElementById('shortOut').textContent = shortStr || '(无符合条件的简码)';
                 document.getElementById('output').style.display = 'block';
+
+                // 滚动到结果区域
+                document.getElementById('output').scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
 
             } catch (err) {
                 showError('处理出错：' + err.message);
