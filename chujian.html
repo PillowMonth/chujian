@@ -263,6 +263,11 @@
         <label for="aeuioSwitch">将以 a / e / u / i / o 结尾的编码视为码长 -1（上屏性质）</label>
         <span style="font-size:0.8em;color:#999;">（开启后，此类词在出简码时按实际长度-1参与阈值判断）</span>
     </div>
+    <div class="switch-row">
+        <input type="checkbox" id="avoidCollisionSwitch">
+        <label for="avoidCollisionSwitch">优先避重：冲突时尝试更长简码（1→2→3）</label>
+        <span style="font-size:0.8em;color:#999;">（开启后，若优先简码冲突，自动尝试下一位长度直至找到不冲突的简码）</span>
+    </div>
 
     <button onclick="generate()">⚡ 开始生成</button>
 
@@ -364,6 +369,7 @@
                 if (isNaN(minDiff) || minDiff < 1) { minDiff = 1; minDiffInput.value = 1; }
 
                 const aeuioEnabled = document.getElementById('aeuioSwitch').checked;
+                const avoidCollision = document.getElementById('avoidCollisionSwitch').checked;
 
                 // ---------- 字频解析 ----------
                 const freqMap = new Map();
@@ -424,7 +430,6 @@
                 for (const row of fullRows) {
                     if (wordMap.has(row.word)) continue;
                     const len = row.code.length;
-                    // adjLen 基于原始长度，不受aeuio规则影响
                     const adjLen = (len < 4 || codeSet.has(row.code)) ? len + 1 : len;
                     wordMap.set(row.word, { code: row.code, freq: row.freq, adjLen });
                     codeSet.add(row.code);
@@ -434,38 +439,60 @@
                 const wordAssigned = new Set();
                 const shortPairs = [];
 
-                for (let i = 1; i <= 3; i++) {
-                    const sortedWords = Array.from(wordMap.keys()).sort((a, b) => {
-                        const va = wordMap.get(a);
-                        const vb = wordMap.get(b);
-                        const scoreA = va.freq * (va.adjLen - i - 1);
-                        const scoreB = vb.freq * (vb.adjLen - i - 1);
-                        if (scoreB !== scoreA) return scoreB - scoreA;
-                        if (vb.freq !== va.freq) return vb.freq - va.freq;
-                        const orderA = orderMap.has(a) ? orderMap.get(a) : Infinity;
-                        const orderB = orderMap.has(b) ? orderMap.get(b) : Infinity;
-                        if (orderA !== orderB) return orderA - orderB;
-                        return a.localeCompare(b, 'zh-CN');
-                    });
+                // 统一按频率/顺序对候选词进行排序（只排一次）
+                const sortedAllWords = Array.from(wordMap.keys()).sort((a, b) => {
+                    const va = wordMap.get(a);
+                    const vb = wordMap.get(b);
+                    const scoreA = va.freq * (va.adjLen - 1);
+                    const scoreB = vb.freq * (vb.adjLen - 1);
+                    if (scoreB !== scoreA) return scoreB - scoreA;
+                    if (vb.freq !== va.freq) return vb.freq - va.freq;
+                    const orderA = orderMap.has(a) ? orderMap.get(a) : Infinity;
+                    const orderB = orderMap.has(b) ? orderMap.get(b) : Infinity;
+                    if (orderA !== orderB) return orderA - orderB;
+                    return a.localeCompare(b, 'zh-CN');
+                });
 
-                    for (const word of sortedWords) {
-                        if (wordAssigned.has(word)) continue;
-                        const v = wordMap.get(word);
-                        if (v.freq < 1) continue;
+                for (const word of sortedAllWords) {
+                    if (wordAssigned.has(word)) continue;
+                    const v = wordMap.get(word);
+                    if (v.freq < 1) continue;
 
-                        // 计算有效长度（可能减去aeuio尾码的1）
-                        const effectiveLen = getEffectiveLength(v.code, aeuioEnabled);
+                    const effectiveLen = getEffectiveLength(v.code, aeuioEnabled);
+                    if (effectiveLen < minCodeLength) continue;
 
-                        // 条件1：有效长度达到下限
-                        if (effectiveLen < minCodeLength) continue;
-                        // 条件2：简码长度差值满足下限
-                        if ((effectiveLen - i) < minDiff) continue;
-
-                        const short = v.code.substring(0, i);
-                        if (short === v.code || codeSet.has(short) || usedShort.has(short)) continue;
-                        usedShort.add(short);
-                        wordAssigned.add(word);
-                        shortPairs.push([word, short]);
+                    if (avoidCollision) {
+                        // 优先避重模式：按顺序尝试1→2→3码，找到第一个不冲突且满足差值条件的简码
+                        let assigned = false;
+                        for (let tryLen = 1; tryLen <= 3; tryLen++) {
+                            // 检查差值条件
+                            if ((effectiveLen - tryLen) < minDiff) continue;
+                            const short = v.code.substring(0, tryLen);
+                            // 简码不能等于全码，不能与已有全码冲突，不能与已分配简码冲突
+                            if (short === v.code || codeSet.has(short) || usedShort.has(short)) {
+                                continue;
+                            }
+                            // 通过所有检查，分配该简码
+                            usedShort.add(short);
+                            wordAssigned.add(word);
+                            shortPairs.push([word, short]);
+                            assigned = true;
+                            break;
+                        }
+                        // 若所有长度都冲突或不符合条件，则跳过该词
+                    } else {
+                        // 普通模式：原有逻辑（按顺序遍历1,2,3，但每个词只分配一次最短的有效简码）
+                        for (let i = 1; i <= 3; i++) {
+                            if ((effectiveLen - i) < minDiff) continue;
+                            const short = v.code.substring(0, i);
+                            if (short === v.code || codeSet.has(short) || usedShort.has(short)) {
+                                continue;
+                            }
+                            usedShort.add(short);
+                            wordAssigned.add(word);
+                            shortPairs.push([word, short]);
+                            break;
+                        }
                     }
                 }
 
@@ -504,6 +531,7 @@
                 const statBadge = document.getElementById('shortStat');
                 let statText = '';
                 if (aeuioEnabled) statText += 'aeuio尾码-1 ';
+                if (avoidCollision) statText += '优先避重 ';
                 if (minCodeLength > 1) statText += `全码≥${minCodeLength}码 `;
                 if (minDiff > 1) statText += `差值≥${minDiff} `;
                 statText += `| 符合条件 ${eligibleCount} 词 | 已分配 ${assignedCount} 条`;
