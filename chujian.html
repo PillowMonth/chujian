@@ -120,15 +120,6 @@
         <span style="font-size:0.8em;color:#999;">（例如设2，则全码长4的字最多出2码简码）</span>
     </div>
     <div class="switch-row">
-        <input type="checkbox" id="aeuioSwitch">
-        <label for="aeuioSwitch">启用“以aeuio结尾的首选码长-1”</label>
-        <span style="font-size:0.8em;color:#999;">结尾字母：</span>
-        <input type="text" id="aeuioLetters" value="aeuio" size="6" placeholder="aeuio" style="font-family: monospace;">
-        <span style="font-size:0.8em;color:#999;">仅对全码长度 ≤</span>
-        <input type="number" id="aeuioMaxLen" value="3" min="1" max="20" step="1">
-        <span style="font-size:0.8em;color:#999;">的首选生效</span>
-    </div>
-    <div class="switch-row">
         <input type="checkbox" id="threeShortOnlyCollision">
         <label for="threeShortOnlyCollision">3简仅用于避重（仅次选出3简）</label>
         <span style="font-size:0.8em;color:#999;">（有重码时，仅给次选词分配3码简码）</span>
@@ -194,22 +185,6 @@
             URL.revokeObjectURL(url);
         }
 
-        function endsWithAny(code, letters) {
-            if (!letters || letters.length === 0) return false;
-            const last = code.charAt(code.length - 1).toLowerCase();
-            return letters.toLowerCase().includes(last);
-        }
-
-        // 计算有效编码长度（仅aeuio规则影响，无次选+1）
-        function getEffectiveLength(word, code, aeuioEnabled, aeuioLetters, aeuioMaxLen, codeFirstWordMap) {
-            const isFirst = (codeFirstWordMap.get(code) === word);
-            // aeuio规则：仅对首选、长度≤阈值且以指定字母结尾时长度-1
-            if (aeuioEnabled && aeuioLetters && isFirst && code.length <= aeuioMaxLen && endsWithAny(code, aeuioLetters)) {
-                return Math.max(1, code.length - 1);
-            }
-            return code.length;
-        }
-
         async function generate() {
             try {
                 const zipinFile = document.getElementById('zipinFile').files[0];
@@ -224,12 +199,6 @@
                 document.getElementById('minCodeLength').value = minCodeLength;
                 let minDiff = parseInt(document.getElementById('minDiff').value) || 1;
                 document.getElementById('minDiff').value = minDiff;
-
-                const aeuioEnabled = document.getElementById('aeuioSwitch').checked;
-                const aeuioLetters = document.getElementById('aeuioLetters').value.trim().toLowerCase();
-                let aeuioMaxLen = parseInt(document.getElementById('aeuioMaxLen').value) || 3;
-                document.getElementById('aeuioMaxLen').value = aeuioMaxLen;
-                const effectiveAeuio = aeuioEnabled && aeuioLetters.length > 0;
 
                 const threeOnlyCollision = document.getElementById('threeShortOnlyCollision').checked;
 
@@ -328,7 +297,7 @@
                         // 3简仅次选避重：跳过首选
                         if (i === 3 && threeOnlyCollision && codeFirstWordMap.get(v.code) === word) continue;
 
-                        const effectiveLen = getEffectiveLength(word, v.code, effectiveAeuio, aeuioLetters, aeuioMaxLen, codeFirstWordMap);
+                        const effectiveLen = v.code.length;
                         if (effectiveLen < minCodeLength) continue;
                         if ((effectiveLen - i) < minDiff) continue;
 
@@ -344,7 +313,7 @@
                 let eligibleCount = 0;
                 for (const [w, v] of wordMap.entries()) {
                     if (v.freq < 1) continue;
-                    const eff = getEffectiveLength(w, v.code, effectiveAeuio, aeuioLetters, aeuioMaxLen, codeFirstWordMap);
+                    const eff = v.code.length;
                     if (eff >= minCodeLength) eligibleCount++;
                 }
 
@@ -368,7 +337,6 @@
 
                 const statBadge = document.getElementById('shortStat');
                 let stat = '';
-                if (effectiveAeuio) stat += `尾字母"${aeuioLetters}"首选-1(≤${aeuioMaxLen}码) `;
                 if (threeOnlyCollision) stat += '3简仅次选避重 ';
                 if (minCodeLength > 1) stat += `全码≥${minCodeLength} `;
                 if (minDiff > 1) stat += `差值≥${minDiff} `;
