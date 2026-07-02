@@ -204,8 +204,14 @@
             animation: fadeIn 0.35s ease;
         }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         .stat-badge {
             display: inline-block;
@@ -223,7 +229,7 @@
     <h2>🌟 简码生成器</h2>
     <p>选择字频文件和全码词库（支持自动跳过表头），生成排序后的全码表与简码表。<br>
         <small>全码表按频率降序；简码表可按需开启排序（1→2→3 分组，组内 A→Z）。<br>
-        ✨ 改进：字频相同时，文件中靠前的词视为频率更高，确保首选/次选识别正确。</small>
+            ✨ 改进：字频相同时，文件中靠前的词视为频率更高，确保首选/次选识别正确。</small>
     </p>
     <div id="errorMsg" class="error"></div>
 
@@ -251,6 +257,11 @@
         <input type="number" id="minDiff" value="1" min="1" max="10" step="1">
         <label for="minDiff">个字符的简码</label>
         <span style="font-size:0.8em;color:#999;">（例如设 2，则全码长 4 的字最多出 2 码简码）</span>
+    </div>
+    <div class="switch-row">
+        <input type="checkbox" id="aeuioSwitch">
+        <label for="aeuioSwitch">将以 a / e / u / i / o 结尾的编码视为码长 -1（上屏性质）</label>
+        <span style="font-size:0.8em;color:#999;">（开启后，此类词在出简码时按实际长度-1参与阈值判断）</span>
     </div>
 
     <button onclick="generate()">⚡ 开始生成</button>
@@ -324,6 +335,16 @@
             showToast('💾 下载完成');
         }
 
+        // 判断编码是否以 a/e/u/i/o 结尾，返回调整后的有效长度（开启aeuio规则时生效）
+        function getEffectiveLength(code, enableAeuio) {
+            if (!enableAeuio) return code.length;
+            const lastChar = code.charAt(code.length - 1).toLowerCase();
+            if ('aeuio'.includes(lastChar)) {
+                return Math.max(1, code.length - 1);
+            }
+            return code.length;
+        }
+
         async function generate() {
             try {
                 const zipinFile = document.getElementById('zipinFile').files[0];
@@ -333,15 +354,16 @@
                 const zipinText = await zipinFile.text();
                 const dictText = await dictFile.text();
 
-                // 获取最小全码长度阈值
+                // 获取各项参数
                 const minCodeLengthInput = document.getElementById('minCodeLength');
                 let minCodeLength = parseInt(minCodeLengthInput.value, 10);
                 if (isNaN(minCodeLength) || minCodeLength < 1) { minCodeLength = 1; minCodeLengthInput.value = 1; }
 
-                // 获取最小差值阈值
                 const minDiffInput = document.getElementById('minDiff');
                 let minDiff = parseInt(minDiffInput.value, 10);
                 if (isNaN(minDiff) || minDiff < 1) { minDiff = 1; minDiffInput.value = 1; }
+
+                const aeuioEnabled = document.getElementById('aeuioSwitch').checked;
 
                 // ---------- 字频解析 ----------
                 const freqMap = new Map();
@@ -402,6 +424,7 @@
                 for (const row of fullRows) {
                     if (wordMap.has(row.word)) continue;
                     const len = row.code.length;
+                    // adjLen 基于原始长度，不受aeuio规则影响
                     const adjLen = (len < 4 || codeSet.has(row.code)) ? len + 1 : len;
                     wordMap.set(row.word, { code: row.code, freq: row.freq, adjLen });
                     codeSet.add(row.code);
@@ -429,10 +452,15 @@
                         if (wordAssigned.has(word)) continue;
                         const v = wordMap.get(word);
                         if (v.freq < 1) continue;
-                        // 全码长度不足 minCodeLength 则跳过
-                        if (v.code.length < minCodeLength) continue;
-                        // 简码长度差值不满足 minDiff 则跳过
-                        if ((v.code.length - i) < minDiff) continue;
+
+                        // 计算有效长度（可能减去aeuio尾码的1）
+                        const effectiveLen = getEffectiveLength(v.code, aeuioEnabled);
+
+                        // 条件1：有效长度达到下限
+                        if (effectiveLen < minCodeLength) continue;
+                        // 条件2：简码长度差值满足下限
+                        if ((effectiveLen - i) < minDiff) continue;
+
                         const short = v.code.substring(0, i);
                         if (short === v.code || codeSet.has(short) || usedShort.has(short)) continue;
                         usedShort.add(short);
@@ -441,8 +469,12 @@
                     }
                 }
 
-                // 统计信息
-                const eligibleCount = Array.from(wordMap.values()).filter(v => v.code.length >= minCodeLength && v.freq >= 1).length;
+                // 统计符合条件的词数（使用有效长度）
+                const eligibleCount = Array.from(wordMap.values()).filter(v => {
+                    if (v.freq < 1) return false;
+                    const effLen = getEffectiveLength(v.code, aeuioEnabled);
+                    return effLen >= minCodeLength;
+                }).length;
                 const assignedCount = shortPairs.length;
 
                 const sortEnabled = document.getElementById('sortToggle').checked;
@@ -471,6 +503,7 @@
 
                 const statBadge = document.getElementById('shortStat');
                 let statText = '';
+                if (aeuioEnabled) statText += 'aeuio尾码-1 ';
                 if (minCodeLength > 1) statText += `全码≥${minCodeLength}码 `;
                 if (minDiff > 1) statText += `差值≥${minDiff} `;
                 statText += `| 符合条件 ${eligibleCount} 词 | 已分配 ${assignedCount} 条`;
