@@ -204,14 +204,8 @@
             animation: fadeIn 0.35s ease;
         }
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .stat-badge {
             display: inline-block;
@@ -229,7 +223,7 @@
     <h2>🌟 简码生成器</h2>
     <p>选择字频文件和全码词库（支持自动跳过表头），生成排序后的全码表与简码表。<br>
         <small>全码表按频率降序；简码表可按需开启排序（1→2→3 分组，组内 A→Z）。<br>
-            ✨ 改进：字频相同时，文件中靠前的词视为频率更高，确保首选/次选识别正确。</small>
+        ✨ 改进：字频相同时，文件中靠前的词视为频率更高，确保首选/次选识别正确。</small>
     </p>
     <div id="errorMsg" class="error"></div>
 
@@ -251,6 +245,12 @@
         <input type="number" id="minCodeLength" value="1" min="1" max="20" step="1">
         <label for="minCodeLength">的字生成简码</label>
         <span style="font-size:0.8em;color:#999;">（设为 1 则全部生成；设为 4 则仅 4 码及以上出简码）</span>
+    </div>
+    <div class="switch-row">
+        <label for="minDiff">仅生成比全码短 ≥</label>
+        <input type="number" id="minDiff" value="1" min="1" max="10" step="1">
+        <label for="minDiff">个字符的简码</label>
+        <span style="font-size:0.8em;color:#999;">（例如设 2，则全码长 4 的字最多出 2 码简码）</span>
     </div>
 
     <button onclick="generate()">⚡ 开始生成</button>
@@ -278,21 +278,14 @@
             const el = document.getElementById('errorMsg');
             el.textContent = msg;
             el.style.display = 'block';
-            setTimeout(() => {
-                el.style.display = 'none';
-            }, 6000);
+            setTimeout(() => { el.style.display = 'none'; }, 6000);
         }
 
         function copyText(elementId) {
             const text = document.getElementById(elementId).textContent;
-            if (!text) {
-                showError('没有可复制的内容');
-                return;
-            }
+            if (!text) { showError('没有可复制的内容'); return; }
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => {
-                    showToast('✅ 已复制到剪贴板');
-                }).catch(() => fallbackCopy(text));
+                navigator.clipboard.writeText(text).then(() => showToast('✅ 已复制到剪贴板')).catch(() => fallbackCopy(text));
             } else {
                 fallbackCopy(text);
             }
@@ -305,43 +298,23 @@
             textarea.style.left = '-9999px';
             document.body.appendChild(textarea);
             textarea.select();
-            try {
-                document.execCommand('copy');
-                showToast('✅ 已复制到剪贴板');
-            } catch (e) {
-                showError('复制失败，请手动复制');
-            }
+            try { document.execCommand('copy'); showToast('✅ 已复制到剪贴板'); } catch (e) { showError('复制失败，请手动复制'); }
             document.body.removeChild(textarea);
         }
 
         function showToast(msg) {
             const toast = document.createElement('div');
             toast.textContent = msg;
-            toast.style.cssText = `
-            position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-            background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:20px;
-            font-size:0.9em;z-index:999;pointer-events:none;opacity:0;
-            transition:opacity 0.3s ease;box-shadow:0 4px 16px rgba(0,0,0,0.2);
-          `;
+            toast.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:20px;font-size:0.9em;z-index:999;pointer-events:none;opacity:0;transition:opacity 0.3s ease;box-shadow:0 4px 16px rgba(0,0,0,0.2);`;
             document.body.appendChild(toast);
-            requestAnimationFrame(() => {
-                toast.style.opacity = '1';
-            });
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => document.body.removeChild(toast), 300);
-            }, 1800);
+            requestAnimationFrame(() => { toast.style.opacity = '1'; });
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => document.body.removeChild(toast), 300); }, 1800);
         }
 
         function downloadText(filename, elementId) {
             const text = document.getElementById(elementId).textContent;
-            if (!text) {
-                showError('没有可下载的内容');
-                return;
-            }
-            const blob = new Blob([text], {
-                type: 'text/plain;charset=utf-8'
-            });
+            if (!text) { showError('没有可下载的内容'); return; }
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -355,10 +328,7 @@
             try {
                 const zipinFile = document.getElementById('zipinFile').files[0];
                 const dictFile = document.getElementById('dictFile').files[0];
-                if (!zipinFile || !dictFile) {
-                    showError('请先选择两个文件');
-                    return;
-                }
+                if (!zipinFile || !dictFile) { showError('请先选择两个文件'); return; }
 
                 const zipinText = await zipinFile.text();
                 const dictText = await dictFile.text();
@@ -366,22 +336,21 @@
                 // 获取最小全码长度阈值
                 const minCodeLengthInput = document.getElementById('minCodeLength');
                 let minCodeLength = parseInt(minCodeLengthInput.value, 10);
-                if (isNaN(minCodeLength) || minCodeLength < 1) {
-                    minCodeLength = 1;
-                    minCodeLengthInput.value = 1;
-                }
+                if (isNaN(minCodeLength) || minCodeLength < 1) { minCodeLength = 1; minCodeLengthInput.value = 1; }
+
+                // 获取最小差值阈值
+                const minDiffInput = document.getElementById('minDiff');
+                let minDiff = parseInt(minDiffInput.value, 10);
+                if (isNaN(minDiff) || minDiff < 1) { minDiff = 1; minDiffInput.value = 1; }
 
                 // ---------- 字频解析 ----------
                 const freqMap = new Map();
-                const orderMap = new Map(); // 记录词语在字频文件中的出现顺序（行号）
+                const orderMap = new Map();
                 let orderCounter = 0;
                 let zlines = zipinText.split(/\r?\n/);
-                // 自动跳过标题行（如果第一行第二列不是数字）
                 if (zlines.length > 0) {
                     const firstParts = zlines[0].trim().split(/\s+/);
-                    if (firstParts.length >= 2 && isNaN(parseFloat(firstParts[1]))) {
-                        zlines.shift();
-                    }
+                    if (firstParts.length >= 2 && isNaN(parseFloat(firstParts[1]))) zlines.shift();
                 }
                 for (let line of zlines) {
                     line = line.trim();
@@ -392,9 +361,7 @@
                         const freq = parseFloat(parts[1]);
                         if (!isNaN(freq)) {
                             freqMap.set(word, freq);
-                            if (!orderMap.has(word)) {
-                                orderMap.set(word, orderCounter++); // 记录首次出现的顺序
-                            }
+                            if (!orderMap.has(word)) orderMap.set(word, orderCounter++);
                         }
                     }
                 }
@@ -403,17 +370,10 @@
                 const fullRows = [];
                 let dlines = dictText.split(/\r?\n/);
                 let startIndex = 0;
-                // 跳过开头的 # 注释行
-                while (startIndex < dlines.length && dlines[startIndex].trim().startsWith('#')) {
-                    startIndex++;
-                }
-                // 跳过 YAML 头（--- ... ---）
+                while (startIndex < dlines.length && dlines[startIndex].trim().startsWith('#')) startIndex++;
                 if (startIndex < dlines.length && dlines[startIndex].trim() === '---') {
                     for (let i = startIndex + 1; i < dlines.length; i++) {
-                        if (dlines[i].trim() === '...' || dlines[i].trim() === '---') {
-                            startIndex = i + 1;
-                            break;
-                        }
+                        if (dlines[i].trim() === '...' || dlines[i].trim() === '---') { startIndex = i + 1; break; }
                     }
                 }
                 for (let i = startIndex; i < dlines.length; i++) {
@@ -424,14 +384,9 @@
                     const word = parts[0];
                     const code = parts[1];
                     const freq = freqMap.get(word) || 0;
-                    fullRows.push({
-                        word,
-                        code,
-                        freq
-                    });
+                    fullRows.push({ word, code, freq });
                 }
 
-                // 全码排序：频率降序，若频率相同 → 字频文件顺序靠前优先，再相同 → 拼音排序
                 fullRows.sort((a, b) => {
                     if (b.freq !== a.freq) return b.freq - a.freq;
                     const orderA = orderMap.has(a.word) ? orderMap.get(a.word) : Infinity;
@@ -447,13 +402,8 @@
                 for (const row of fullRows) {
                     if (wordMap.has(row.word)) continue;
                     const len = row.code.length;
-                    // 调整长度：若原始长度 < 4 或编码重复，则 +1
                     const adjLen = (len < 4 || codeSet.has(row.code)) ? len + 1 : len;
-                    wordMap.set(row.word, {
-                        code: row.code,
-                        freq: row.freq,
-                        adjLen
-                    });
+                    wordMap.set(row.word, { code: row.code, freq: row.freq, adjLen });
                     codeSet.add(row.code);
                 }
 
@@ -462,7 +412,6 @@
                 const shortPairs = [];
 
                 for (let i = 1; i <= 3; i++) {
-                    // 排序：综合得分 → 频率 → 字频顺序 → 拼音
                     const sortedWords = Array.from(wordMap.keys()).sort((a, b) => {
                         const va = wordMap.get(a);
                         const vb = wordMap.get(b);
@@ -480,8 +429,10 @@
                         if (wordAssigned.has(word)) continue;
                         const v = wordMap.get(word);
                         if (v.freq < 1) continue;
-                        // ✨ 新增：仅对全码长度 >= minCodeLength 的词分配简码
+                        // 全码长度不足 minCodeLength 则跳过
                         if (v.code.length < minCodeLength) continue;
+                        // 简码长度差值不满足 minDiff 则跳过
+                        if ((v.code.length - i) < minDiff) continue;
                         const short = v.code.substring(0, i);
                         if (short === v.code || codeSet.has(short) || usedShort.has(short)) continue;
                         usedShort.add(short);
@@ -491,11 +442,9 @@
                 }
 
                 // 统计信息
-                const eligibleCount = Array.from(wordMap.values()).filter(v => v.code.length >= minCodeLength && v
-                    .freq >= 1).length;
+                const eligibleCount = Array.from(wordMap.values()).filter(v => v.code.length >= minCodeLength && v.freq >= 1).length;
                 const assignedCount = shortPairs.length;
 
-                // 根据开关决定是否排序简码输出
                 const sortEnabled = document.getElementById('sortToggle').checked;
                 let shortStr;
                 if (sortEnabled) {
@@ -520,26 +469,19 @@
                     shortStr = shortPairs.map(([word, code]) => `${word}\t${code}`).join('\n');
                 }
 
-                // 更新统计徽章
                 const statBadge = document.getElementById('shortStat');
-                if (minCodeLength > 1) {
-                    statBadge.textContent =
-                        `阈值≥${minCodeLength}码 | 符合条件 ${eligibleCount} 词 | 已分配 ${assignedCount} 条`;
-                } else {
-                    statBadge.textContent = `已分配 ${assignedCount} 条简码`;
-                }
+                let statText = '';
+                if (minCodeLength > 1) statText += `全码≥${minCodeLength}码 `;
+                if (minDiff > 1) statText += `差值≥${minDiff} `;
+                statText += `| 符合条件 ${eligibleCount} 词 | 已分配 ${assignedCount} 条`;
+                statBadge.textContent = statText;
                 statBadge.style.display = 'inline-block';
 
-                // 显示结果
                 document.getElementById('starmoonOut').textContent = starmoonStr || '(无结果)';
                 document.getElementById('shortOut').textContent = shortStr || '(无符合条件的简码)';
                 document.getElementById('output').style.display = 'block';
 
-                // 滚动到结果区域
-                document.getElementById('output').scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
+                document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
             } catch (err) {
                 showError('处理出错：' + err.message);
